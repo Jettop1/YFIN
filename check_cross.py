@@ -2,7 +2,7 @@ import os
 import requests
 import yfinance as yf
 
-ASSETS = ["BTC-USD", "ETH-USD"]
+ASSETS = ["EUR/USD"]
 INTERVAL = "5m"
 PERIOD = "1d"
 
