@@ -8,6 +8,9 @@ on:
         description: "Invia un messaggio di prova su Telegram"
         type: boolean
         default: true
+  # permette a un servizio esterno (es. cron-job.org) di avviare il controllo
+  repository_dispatch:
+    types: [check]
 permissions:
   contents: write   # serve per salvare state.json (ultimo incrocio notificato)
 concurrency:
