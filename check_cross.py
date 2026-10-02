@@ -14,8 +14,8 @@ ASSETS = ["EURUSD=X"]
 #                   5 min  -> TIMEFRAME_MIN=5,   MAX_AGE_MIN=30,  cron "*/5 * * * *"
 #                   15 min -> TIMEFRAME_MIN=15,  MAX_AGE_MIN=60,  cron "*/15 * * * *"
 #                   4 ore  -> TIMEFRAME_MIN=240, MAX_AGE_MIN=240, cron "*/15 * * * *"
-TIMEFRAME_MIN = 240
-MAX_AGE_MIN = 240
+TIMEFRAME_MIN = 5
+MAX_AGE_MIN = 30
 # ---------------------------------------------------------------------------
 
 TZ_FOREX = "America/New_York"  # le candele forex da 4h partono da 17:00 di New York
