@@ -1,14 +1,12 @@
 name: EMA cross
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       test:
         description: "Invia un messaggio di prova su Telegram"
         type: boolean
         default: true
-  # permette a un servizio esterno (es. cron-job.org) di avviare il controllo
+  # il controllo periodico lo avvia cron-job.org (ogni ora al minuto 5)
   repository_dispatch:
     types: [check]
 permissions:
