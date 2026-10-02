@@ -1,3 +1,4 @@
+import json
 import os
 import pandas as pd
 import requests
@@ -7,16 +8,20 @@ ASSETS = ["EURUSD=X"]
 
 # --- Impostazioni del timeframe -------------------------------------------
 # TIMEFRAME_MIN: durata della candela in minuti (5, 15, 30, 60, 240 = 4h...)
-# WINDOW_MIN:    notifica solo se la candela si è chiusa da meno di X minuti.
-#                Va tenuto vicino all'intervallo del cron in ema.yml:
-#                   5 min  -> TIMEFRAME_MIN=5,   WINDOW_MIN=5,  cron "*/5 * * * *"
-#                   15 min -> TIMEFRAME_MIN=15,  WINDOW_MIN=15, cron "*/15 * * * *"
-#                   4 ore  -> TIMEFRAME_MIN=240, WINDOW_MIN=60, cron "5 * * * *"
+# MAX_AGE_MIN:   un incrocio viene notificato solo se la sua candela si è
+#                chiusa da meno di X minuti (evita avvisi vecchi/inutili).
+#                Ogni incrocio viene comunque notificato UNA volta sola.
+#                   5 min  -> TIMEFRAME_MIN=5,   MAX_AGE_MIN=30,  cron "*/5 * * * *"
+#                   15 min -> TIMEFRAME_MIN=15,  MAX_AGE_MIN=60,  cron "*/15 * * * *"
+#                   4 ore  -> TIMEFRAME_MIN=240, MAX_AGE_MIN=240, cron "5 * * * *"
 TIMEFRAME_MIN = 5
-WINDOW_MIN = 5
+MAX_AGE_MIN = 30
 # ---------------------------------------------------------------------------
 
 TZ_FOREX = "America/New_York"  # le candele forex da 4h partono da 17:00 di New York
+TZ_LOCAL = "Europe/Rome"
+STATE_FILE = "state.json"      # ricorda l'ultimo incrocio già notificato
+WARMUP = 30                    # candele iniziali scartate (le EMA non sono ancora stabili)
 
 
 def send(msg):
@@ -52,28 +57,71 @@ def closed_candles(close_raw, now):
     return candles[end <= now], end[end <= now]
 
 
-TEST = os.environ.get("TEST") == "true"
-report = []
-now = pd.Timestamp.now(tz="UTC")
+def last_cross(ema9, ema21, ends):
+    """Ultimo incrocio (in qualsiasi direzione) tra le candele chiuse.
+    Ritorna (direzione, istante di chiusura della candela) oppure None."""
+    above = (ema9 > ema21).iloc[WARMUP:]
+    changed = above != above.shift(1)
+    changed.iloc[0] = False
+    if not changed.any():
+        return None
+    pos = changed.to_numpy().nonzero()[0][-1]
+    return ("su" if above.iloc[pos] else "giu"), ends[WARMUP:][pos]
 
-if __name__ == "__main__":
+
+def check_asset(asset, raw, now, state):
+    """Ritorna (riga di report, messaggio da inviare o None).
+    Aggiorna `state` quando un incrocio viene notificato."""
+    close, ends = closed_candles(raw, now)
+    ema9 = close.ewm(span=9, adjust=False).mean()
+    ema21 = close.ewm(span=21, adjust=False).mean()
+    age_min = (now - ends[-1]).total_seconds() / 60
+    line = (f"{asset}: EMA9={ema9.iloc[-1]:.5f} EMA21={ema21.iloc[-1]:.5f} "
+            f"({'sopra' if ema9.iloc[-1] > ema21.iloc[-1] else 'sotto'}), "
+            f"ultima candela {label()} chiusa {age_min:.0f} min fa")
+
+    cross = last_cross(ema9, ema21, ends)
+    message = None
+    if cross:
+        direction, end = cross
+        start = (end - pd.Timedelta(minutes=TIMEFRAME_MIN)).tz_convert(TZ_LOCAL)
+        cross_age = (now - end).total_seconds() / 60
+        arrow = "🟢 EMA 9 incrocia SOPRA EMA 21" if direction == "su" else "🔴 EMA 9 incrocia SOTTO EMA 21"
+        line += (f"\nultimo incrocio: {'al rialzo' if direction == 'su' else 'al ribasso'}, "
+                 f"candela delle {start.strftime('%H:%M')} (ora italiana, {start.strftime('%d/%m')}), "
+                 f"{cross_age:.0f} min fa")
+        key = end.tz_convert("UTC").isoformat()
+        if cross_age <= MAX_AGE_MIN and state.get(asset) != key:
+            message = f"{arrow}\n{asset} ({label()}), candela delle {start.strftime('%H:%M')}"
+            state[asset] = key
+    return line, message
+
+
+def main():
+    test = os.environ.get("TEST") == "true"
+    now = pd.Timestamp.now(tz="UTC")
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        state = {}
+    old_state = dict(state)
+
+    report = []
     for a in ASSETS:
-        close, ends = closed_candles(download(a), now)
-        ema9 = close.ewm(span=9, adjust=False).mean()
-        ema21 = close.ewm(span=21, adjust=False).mean()
-        prev = ema9.iloc[-2] - ema21.iloc[-2]
-        last = ema9.iloc[-1] - ema21.iloc[-1]
-        age_min = (now - ends[-1]).total_seconds() / 60
-        line = (f"{a}: EMA9={ema9.iloc[-1]:.5f} EMA21={ema21.iloc[-1]:.5f} "
-                f"({'sopra' if last > 0 else 'sotto'}), "
-                f"ultima candela {label()} chiusa {age_min:.0f} min fa")
+        line, message = check_asset(a, download(a), now, state)
         print(line)
         report.append(line)
-        if age_min <= WINDOW_MIN:
-            if prev <= 0 < last:
-                send(f"🟢 {a}: EMA 9 incrocia sopra EMA 21 ({label()})")
-            elif prev >= 0 > last:
-                send(f"🔴 {a}: EMA 9 incrocia sotto EMA 21 ({label()})")
+        if message:
+            send(message)
 
-    if TEST:
+    if state != old_state:
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+
+    if test:
         send("✅ Test EMA alert funzionante\n" + "\n".join(report))
+
+
+if __name__ == "__main__":
+    main()
