@@ -15,6 +15,9 @@ def send(msg):
     )
 
 
+TEST = os.environ.get("TEST") == "true"
+report = []
+
 for a in ASSETS:
     close = yf.download(a, period=PERIOD, interval=INTERVAL,
                         progress=False)["Close"].squeeze()
@@ -23,7 +26,14 @@ for a in ASSETS:
     # ultima candela chiusa = -2 (la -1 è ancora in formazione)
     prev = ema9.iloc[-3] - ema21.iloc[-3]
     last = ema9.iloc[-2] - ema21.iloc[-2]
+    line = (f"{a}: EMA9={ema9.iloc[-2]:.5f} EMA21={ema21.iloc[-2]:.5f} "
+            f"({'sopra' if last > 0 else 'sotto'})")
+    print(line)
+    report.append(line)
     if prev <= 0 < last:
         send(f"🟢 {a}: EMA 9 incrocia sopra EMA 21 ({INTERVAL})")
     elif prev >= 0 > last:
         send(f"🔴 {a}: EMA 9 incrocia sotto EMA 21 ({INTERVAL})")
+
+if TEST:
+    send("✅ Test EMA alert funzionante\n" + "\n".join(report))

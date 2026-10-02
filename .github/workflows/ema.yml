@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    inputs:
+      test:
+        description: "Invia un messaggio di prova su Telegram"
+        type: boolean
+        default: true
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,3 +21,4 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TEST: ${{ inputs.test }}
