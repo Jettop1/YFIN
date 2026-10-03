@@ -38,6 +38,13 @@ def label():
     return f"{TIMEFRAME_MIN}m"
 
 
+def tv_link(asset):
+    """Link al grafico TradingView della coppia, già sul timeframe impostato.
+    Simbolo Yahoo 'EURUSD=X' -> simbolo TradingView 'FX:EURUSD'."""
+    symbol = f"FX:{asset[:-2]}" if asset.endswith("=X") else asset
+    return f"https://www.tradingview.com/chart/?symbol={symbol}&interval={TIMEFRAME_MIN}"
+
+
 def download(asset):
     if TIMEFRAME_MIN < 60:
         data = yf.download(asset, period="5d", interval="5m", progress=False)
@@ -92,8 +99,10 @@ def check_asset(asset, raw, now, state):
                  f"{cross_age:.0f} min fa")
         key = end.tz_convert("UTC").isoformat()
         if cross_age <= MAX_AGE_MIN and state.get(asset) != key:
-            message = f"{arrow}\n{asset} ({label()}), candela delle {start.strftime('%H:%M')}"
+            message = (f"{arrow}\n{asset} ({label()}), candela delle {start.strftime('%H:%M')}\n"
+                       f"{tv_link(asset)}")
             state[asset] = key
+    line += f"\n{tv_link(asset)}"
     return line, message
 
 
