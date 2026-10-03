@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-ASSETS = ["EURUSD=X"]
+ASSETS = ["EURUSD=X", "GBPUSD=X", "USDJPY=X"]
 
 # --- Impostazioni del timeframe -------------------------------------------
 # TIMEFRAME_MIN: durata della candela in minuti (5, 15, 30, 60, 240 = 4h...)
