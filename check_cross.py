@@ -40,8 +40,10 @@ def label():
 
 def tv_link(asset):
     """Link al grafico TradingView della coppia, già sul timeframe impostato.
-    Simbolo Yahoo 'EURUSD=X' -> simbolo TradingView 'FX:EURUSD'."""
-    symbol = f"FX:{asset[:-2]}" if asset.endswith("=X") else asset
+    Usa la fonte FX_IDC (ICE Data Services), la stessa da cui Yahoo prende
+    i cambi '=X', così il grafico mostra gli stessi prezzi dello script.
+    Simbolo Yahoo 'EURUSD=X' -> simbolo TradingView 'FX_IDC:EURUSD'."""
+    symbol = f"FX_IDC:{asset[:-2]}" if asset.endswith("=X") else asset
     return f"https://www.tradingview.com/chart/?symbol={symbol}&interval={TIMEFRAME_MIN}"
 
 
